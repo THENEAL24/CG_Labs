@@ -1,0 +1,14 @@
+# Target labels
+ vk-bootstrap-populate
+# Source files and their labels
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/CMakeFiles/vk-bootstrap-populate
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/CMakeFiles/vk-bootstrap-populate.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/CMakeFiles/vk-bootstrap-populate-complete.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-build.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-configure.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-download.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-install.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-mkdir.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-patch.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-test.rule
+/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-update.rule

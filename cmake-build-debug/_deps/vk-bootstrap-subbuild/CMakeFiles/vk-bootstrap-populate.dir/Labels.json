@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/CMakeFiles/vk-bootstrap-populate"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/CMakeFiles/vk-bootstrap-populate.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/CMakeFiles/vk-bootstrap-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-build.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-download.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-install.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-test.rule"
+		},
+		{
+			"file" : "/Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug/_deps/vk-bootstrap-subbuild/vk-bootstrap-populate-prefix/src/vk-bootstrap-populate-stamp/vk-bootstrap-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"vk-bootstrap-populate"
+		],
+		"name" : "vk-bootstrap-populate"
+	}
+}

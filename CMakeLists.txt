@@ -10,13 +10,11 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-if(LINUX)
+if(DARWIN OR LINUX)
 	target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
 elseif(MSVC)
 	target_compile_options(${PROJECT_NAME} PRIVATE /W4)
 	target_link_options(${PROJECT_NAME} PRIVATE /subsystem:windows /entry:mainCRTStartup)
-else()
-	message(FATAL_ERROR "${CMAKE_SYSTEM_NAME} is not supported")
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD_REQUIRED TRUE CXX_STANDARD 20)

@@ -1,0 +1,5 @@
+/Users/migermanenko/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Users/migermanenko/Applications/CLion.app/Contents/bin/ninja/mac/aarch64/ninja -DVulkan_LIBRARY=/Users/migermanenko/VulkanSDK/1.4.321.0/macOS/lib/libvulkan.dylib -DVulkan_INCLUDE_DIR=/Users/migermanenko/VulkanSDK/1.4.321.0/macOS/include -G Ninja -S /Users/migermanenko/Documents/CG/CG_Labs -B /Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug
+-- Including Cocoa support
+-- Configuring done (0.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/migermanenko/Documents/CG/CG_Labs/cmake-build-debug

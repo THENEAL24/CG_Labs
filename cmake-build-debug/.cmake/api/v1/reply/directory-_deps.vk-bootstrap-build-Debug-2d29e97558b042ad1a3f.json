@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "_deps/vk-bootstrap-build",
+		"source" : "cmake-build-debug/_deps/vk-bootstrap-src"
+	}
+}

@@ -26,10 +26,17 @@ struct Vector {
 
 struct Vertex {
 	Vector position;
-	// NOTE: You can add more attributes
+	// ПРИМЕЧАНИЕ: Здесь можно добавить дополнительные атрибуты
 };
 
-// NOTE: These variable will be available to shaders through push constant uniform
+struct Cone {
+	Vector position;
+	float rotation;
+	float rotation_speed;
+	float scale;
+};
+
+// ПРИМЕЧАНИЕ: Эти переменные будут доступны шейдерам через push constant uniform
 struct ShaderConstants {
 	Matrix projection;
 	Matrix transform;
@@ -46,14 +53,28 @@ VkShaderModule fragment_shader_module;
 VkPipelineLayout pipeline_layout;
 VkPipeline pipeline;
 
-// NOTE: Declare buffers and other variables here
+// ПРИМЕЧАНИЕ: Объявляем буферы и другие переменные здесь
 VulkanBuffer vertex_buffer;
 VulkanBuffer index_buffer;
+uint32_t index_count = 0;
 
-Vector model_position = {0.0f, 0.0f, 5.0f};
-float model_rotation;
-Vector model_color = {0.5f, 1.0f, 0.7f };
-bool model_spin = true;
+constexpr int NUM_CONES = 3;
+Cone cones[NUM_CONES] = {
+	{{-3.5f, -1.0f, 6.0f}, 0.0f, 0.5f, 1.0f}, 
+	{{0.0f, 0.5f, 6.0f}, 0.0f, 1.0f, 1.0f},
+	{{3.5f, 2.0f, 6.0f}, 0.0f, 1.5f, 1.0f},
+};
+
+Vector fixed_color = {0.2f, 0.7f, 0.9f};
+
+float rotation_speed_multiplier = 1.0f;
+
+// Переключение проекций
+bool use_perspective_projection = true;
+
+// Анимация с паузой и реверсом
+bool animation_paused = false;
+float animation_direction = 1.0f;  // 1.0f = вперёд, -1.0f = назад
 
 Matrix identity() {
 	Matrix result{};
@@ -82,6 +103,21 @@ Matrix projection(float fov, float aspect_ratio, float near, float far) {
 	return result;
 }
 
+Matrix orthographic_projection(float left, float right, float bottom, float top, float near, float far) {
+	Matrix result{};
+	
+	result.m[0][0] = 2.0f / (right - left);
+	result.m[1][1] = 2.0f / (top - bottom);
+	result.m[2][2] = 1.0f / (far - near);
+	result.m[3][3] = 1.0f;
+	
+	result.m[3][0] = -(right + left) / (right - left);
+	result.m[3][1] = -(top + bottom) / (top - bottom);
+	result.m[3][2] = -near / (far - near);
+	
+	return result;
+}
+
 Matrix translation(Vector vector) {
 	Matrix result = identity();
 
@@ -89,6 +125,16 @@ Matrix translation(Vector vector) {
 	result.m[3][1] = vector.y;
 	result.m[3][2] = vector.z;
 
+	return result;
+}
+
+Matrix scaling(float scale) {
+	Matrix result = identity();
+	
+	result.m[0][0] = scale;
+	result.m[1][1] = scale;
+	result.m[2][2] = scale;
+	
 	return result;
 }
 
@@ -105,6 +151,8 @@ Matrix rotation(Vector axis, float angle) {
 	float cosa = cosf(angle);
 	float cosv = 1.0f - cosa;
 
+	// Формула вращения Родрига
+
 	result.m[0][0] = (axis.x * axis.x * cosv) + cosa;
 	result.m[0][1] = (axis.x * axis.y * cosv) + (axis.z * sina);
 	result.m[0][2] = (axis.x * axis.z * cosv) - (axis.y * sina);
@@ -117,7 +165,7 @@ Matrix rotation(Vector axis, float angle) {
 	result.m[2][1] = (axis.z * axis.y * cosv) - (axis.x * sina);
 	result.m[2][2] = (axis.z * axis.z * cosv) + cosa;
 
-	result.m[3][3] = 1.0f;
+	result.m[3][3] = 1.0f; // делает матрицу корректной для использования в однородных координатах
 
 	return result;
 }
@@ -136,8 +184,8 @@ Matrix multiply(const Matrix& a, const Matrix& b) {
 	return result;
 }
 
-// NOTE: Loads shader byte code from file
-// NOTE: Your shaders are compiled via CMake with this code too, look it up
+// ПРИМЕЧАНИЕ: Загружает байт-код шейдера из файла
+// ПРИМЕЧАНИЕ: Ваши шейдеры компилируются через CMake, посмотрите этот код
 VkShaderModule loadShaderModule(const char* path) {
 	std::ifstream file(path, std::ios::binary | std::ios::ate);
 	size_t size = file.tellg();
@@ -168,7 +216,7 @@ VulkanBuffer createBuffer(size_t size, void *data, VkBufferUsageFlags usage) {
 	VulkanBuffer result{};
 
 	{
-		// NOTE: We create a buffer of specific usage with specified size
+		// ПРИМЕЧАНИЕ: Создаём буфер с указанным назначением и размером
 		VkBufferCreateInfo info{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 			.size = size,
@@ -182,27 +230,27 @@ VulkanBuffer createBuffer(size_t size, void *data, VkBufferUsageFlags usage) {
 		}
 	}
 
-	// NOTE: Creating a buffer does not allocate memory,
-	//       only a buffer **object** was created.
-	//       So, we allocate memory for the buffer
+	// ПРИМЕЧАНИЕ: Создание буфера не выделяет память,
+	//             создаётся только **объект** буфера.
+	//             Поэтому выделяем память для буфера
 
 	{
-		// NOTE: Ask buffer about its memory requirements
+		// ПРИМЕЧАНИЕ: Запрашиваем у буфера требования к памяти
 		VkMemoryRequirements requirements;
 		vkGetBufferMemoryRequirements(device, result.buffer, &requirements);
 
-		// NOTE: Ask GPU about types of memory it supports
+		// ПРИМЕЧАНИЕ: Запрашиваем у GPU типы памяти, которые он поддерживает
 		VkPhysicalDeviceMemoryProperties properties;
 		vkGetPhysicalDeviceMemoryProperties(physical_device, &properties);
 
-		// NOTE: We want type of memory which is visible to both CPU and GPU
-		// NOTE: HOST is CPU, DEVICE is GPU; we are interested in "CPU" visible memory
-		// NOTE: COHERENT means that CPU cache will be invalidated upon mapping memory region
+		// ПРИМЕЧАНИЕ: Нам нужен тип памяти, доступный как CPU, так и GPU
+		// ПРИМЕЧАНИЕ: HOST - это CPU, DEVICE - это GPU; нам нужна память, видимая для CPU
+		// ПРИМЕЧАНИЕ: COHERENT означает, что кэш CPU будет инвалидирован при маппинге области памяти
 		const VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
 		                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
-		// NOTE: Linear search through types of memory until
-		//       one type matches the requirements, thats the index of memory type
+		// ПРИМЕЧАНИЕ: Линейный поиск по типам памяти, пока
+		//             один из типов не соответствует требованиям - это индекс типа памяти
 		uint32_t index = UINT_MAX;
 		for (uint32_t i = 0; i < properties.memoryTypeCount; ++i) {
 			const VkMemoryType& type = properties.memoryTypes[i];
@@ -219,7 +267,7 @@ VulkanBuffer createBuffer(size_t size, void *data, VkBufferUsageFlags usage) {
 			return {};
 		}
 
-		// NOTE: Allocate required memory amount in appropriate memory type
+		// ПРИМЕЧАНИЕ: Выделяем необходимый объём памяти в подходящем типе памяти
 		VkMemoryAllocateInfo info{
 			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 			.allocationSize = requirements.size,
@@ -231,13 +279,13 @@ VulkanBuffer createBuffer(size_t size, void *data, VkBufferUsageFlags usage) {
 			return {};
 		}
 
-		// NOTE: Link allocated memory with a buffer
+		// ПРИМЕЧАНИЕ: Связываем выделенную память с буфером
 		if (vkBindBufferMemory(device, result.buffer, result.memory, 0) != VK_SUCCESS) {
 			std::cerr << "Failed to bind Vulkan  buffer memory\n";
 			return {};
 		}
 
-		// NOTE: Get pointer to allocated memory
+		// ПРИМЕЧАНИЕ: Получаем указатель на выделенную память
 		void* device_data;
 		vkMapMemory(device, result.memory, 0, requirements.size, 0, &device_data);
 
@@ -260,7 +308,7 @@ void initialize() {
 	VkDevice& device = veekay::app.vk_device;
 	VkPhysicalDevice& physical_device = veekay::app.vk_physical_device;
 
-	{ // NOTE: Build graphics pipeline
+	{ // ПРИМЕЧАНИЕ: Строим графический конвейер
 		vertex_shader_module = loadShaderModule("./shaders/shader.vert.spv");
 		if (!vertex_shader_module) {
 			std::cerr << "Failed to load Vulkan vertex shader from file\n";
@@ -277,7 +325,7 @@ void initialize() {
 
 		VkPipelineShaderStageCreateInfo stage_infos[2];
 
-		// NOTE: Vertex shader stage
+		// ПРИМЕЧАНИЕ: Этап вершинного шейдера
 		stage_infos[0] = VkPipelineShaderStageCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -285,7 +333,7 @@ void initialize() {
 			.pName = "main",
 		};
 
-		// NOTE: Fragment shader stage
+		// ПРИМЕЧАНИЕ: Этап фрагментного шейдера
 		stage_infos[1] = VkPipelineShaderStageCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -293,25 +341,25 @@ void initialize() {
 			.pName = "main",
 		};
 
-		// NOTE: How many bytes does a vertex take?
+		// ПРИМЕЧАНИЕ: Сколько байт занимает одна вершина?
 		VkVertexInputBindingDescription buffer_binding{
 			.binding = 0,
 			.stride = sizeof(Vertex),
 			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
 		};
 
-		// NOTE: Declare vertex attributes
+		// ПРИМЕЧАНИЕ: Объявляем атрибуты вершин
 		VkVertexInputAttributeDescription attributes[] = {
 			{
-				.location = 0, // NOTE: First attribute
-				.binding = 0, // NOTE: First vertex buffer
-				.format = VK_FORMAT_R32G32B32_SFLOAT, // NOTE: 3-component vector of floats
-				.offset = offsetof(Vertex, position), // NOTE: Offset of "position" field in a Vertex struct
+				.location = 0, // ПРИМЕЧАНИЕ: Первый атрибут
+				.binding = 0, // ПРИМЕЧАНИЕ: Первый вершинный буфер
+				.format = VK_FORMAT_R32G32B32_SFLOAT, // ПРИМЕЧАНИЕ: 3-компонентный вектор из float
+				.offset = offsetof(Vertex, position), // ПРИМЕЧАНИЕ: Смещение поля "position" в структуре Vertex
 			},
-			// NOTE: If you want more attributes per vertex, declare them here
+			// ПРИМЕЧАНИЕ: Если нужно больше атрибутов на вершину, объявите их здесь
 #if 0
 			{
-				.location = 1, // NOTE: Second attribute
+				.location = 1, // ПРИМЕЧАНИЕ: Второй атрибут
 				.binding = 0,
 				.format = VK_FORMAT_XXX,
 				.offset = offset(Vertex, your_attribute),
@@ -319,7 +367,7 @@ void initialize() {
 #endif
 		};
 
-		// NOTE: Bring 
+		// ПРИМЕЧАНИЕ: Собираем всё вместе
 		VkPipelineVertexInputStateCreateInfo input_state_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 			.vertexBindingDescriptionCount = 1,
@@ -328,16 +376,16 @@ void initialize() {
 			.pVertexAttributeDescriptions = attributes,
 		};
 
-		// NOTE: Every three vertices make up a triangle,
-		//       so our vertex buffer contains a "list of triangles"
+		// ПРИМЕЧАНИЕ: Каждые три вершины образуют треугольник,
+		//             поэтому наш вершинный буфер содержит "список треугольников"
 		VkPipelineInputAssemblyStateCreateInfo assembly_state_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 			.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 		};
 
-		// NOTE: Declare clockwise triangle order as front-facing
-		//       Discard triangles that are facing away
-		//       Fill triangles, don't draw lines instaed
+		// ПРИМЕЧАНИЕ: Объявляем порядок вершин по часовой стрелке как лицевую сторону
+		//             Отбрасываем треугольники, обращённые от камеры
+		//             Заполняем треугольники, а не рисуем линии вместо них
 		VkPipelineRasterizationStateCreateInfo raster_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 			.polygonMode = VK_POLYGON_MODE_FILL,
@@ -346,7 +394,7 @@ void initialize() {
 			.lineWidth = 1.0f,
 		};
 
-		// NOTE: Use 1 sample per pixel
+		// ПРИМЕЧАНИЕ: Используем 1 сэмпл на пиксель
 		VkPipelineMultisampleStateCreateInfo sample_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
@@ -368,7 +416,7 @@ void initialize() {
 			.extent = {veekay::app.window_width, veekay::app.window_height},
 		};
 
-		// NOTE: Let rasterizer draw on the entire window
+		// ПРИМЕЧАНИЕ: Позволяем растеризатору рисовать на всём окне
 		VkPipelineViewportStateCreateInfo viewport_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 
@@ -379,7 +427,7 @@ void initialize() {
 			.pScissors = &scissor,
 		};
 
-		// NOTE: Let rasterizer perform depth-testing and overwrite depth values on condition pass
+		// ПРИМЕЧАНИЕ: Позволяем растеризатору выполнять тест глубины и перезаписывать значения глубины при успехе
 		VkPipelineDepthStencilStateCreateInfo depth_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 			.depthTestEnable = true,
@@ -387,7 +435,7 @@ void initialize() {
 			.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
 		};
 
-		// NOTE: Let fragment shader write all the color channels
+		// ПРИМЕЧАНИЕ: Позволяем фрагментному шейдеру записывать все цветовые каналы
 		VkPipelineColorBlendAttachmentState attachment_info{
 			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
 			                  VK_COLOR_COMPONENT_G_BIT |
@@ -395,7 +443,7 @@ void initialize() {
 			                  VK_COLOR_COMPONENT_A_BIT,
 		};
 
-		// NOTE: Let rasterizer just copy resulting pixels onto a buffer, don't blend
+		// ПРИМЕЧАНИЕ: Позволяем растеризатору просто копировать результирующие пиксели в буфер, без смешивания
 		VkPipelineColorBlendStateCreateInfo blend_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 
@@ -406,21 +454,21 @@ void initialize() {
 			.pAttachments = &attachment_info
 		};
 
-		// NOTE: Declare constant memory region visible to vertex and fragment shaders
+		// ПРИМЕЧАНИЕ: Объявляем область константной памяти, видимую вершинному и фрагментному шейдерам
 		VkPushConstantRange push_constants{
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT |
 			              VK_SHADER_STAGE_FRAGMENT_BIT,
 			.size = sizeof(ShaderConstants),
 		};
 
-		// NOTE: Declare external data sources, only push constants this time
+		// ПРИМЕЧАНИЕ: Объявляем внешние источники данных, только push constants в этот раз
 		VkPipelineLayoutCreateInfo layout_info{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 			.pushConstantRangeCount = 1,
 			.pPushConstantRanges = &push_constants,
 		};
 
-		// NOTE: Create pipeline layout
+		// ПРИМЕЧАНИЕ: Создаём layout пайплайна
 		if (vkCreatePipelineLayout(device, &layout_info,
 		                           nullptr, &pipeline_layout) != VK_SUCCESS) {
 			std::cerr << "Failed to create Vulkan pipeline layout\n";
@@ -443,7 +491,7 @@ void initialize() {
 			.renderPass = veekay::app.vk_render_pass,
 		};
 
-		// NOTE: Create graphics pipeline
+		// ПРИМЕЧАНИЕ: Создаём графический пайплайн
 		if (vkCreateGraphicsPipelines(device, nullptr,
 		                              1, &info, nullptr, &pipeline) != VK_SUCCESS) {
 			std::cerr << "Failed to create Vulkan pipeline\n";
@@ -452,35 +500,60 @@ void initialize() {
 		}
 	}
 
-	// TODO: You define model vertices and create buffers here
-	// TODO: Index buffer has to be created here too
-	// NOTE: Look for createBuffer function
+	// ПРИМЕЧАНИЕ: Генерируем геометрию конуса
+	const int cone_segments = 16; // Количество сегментов по окружности основания
+	const float cone_radius = 1.0f;
+	const float cone_height = 2.0f;
+	
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+	
+	// Вершина центра основания (индекс 0)
+	vertices.push_back({{0.0f, 0.0f, 0.0f}});
+	
+	// Вершины окружности основания (индексы от 1 до cone_segments)
+	for (int i = 0; i < cone_segments; i++) {
+		float angle = 2.0f * M_PI * i / cone_segments;
+		float x = cos(angle) * cone_radius;
+		float z = sin(angle) * cone_radius;
+		vertices.push_back({{x, 0.0f, z}});
+	}
+	
+	// Вершина конуса (индекс cone_segments + 1)
+	vertices.push_back({{0.0f, cone_height, 0.0f}});
+	
+	// Генерируем индексы для треугольников основания
+	for (int i = 0; i < cone_segments; i++) {
+		int next = (i + 1) % cone_segments;
+		// Треугольник: центр -> вершина i -> следующая вершина
+		indices.push_back(0);
+		indices.push_back(i + 1);
+		indices.push_back(next + 1);
+	}
+	
+	// Генерируем индексы для боковых треугольников
+	int tip_index = cone_segments + 1;
+	for (int i = 0; i < cone_segments; i++) {
+		int next = (i + 1) % cone_segments;
+		// Треугольник: вершина i -> вершина конуса -> следующая вершина
+		indices.push_back(i + 1);
+		indices.push_back(tip_index);
+		indices.push_back(next + 1);
+	}
 
-	// (v0)------(v1)
-	//  |  \       |
-	//  |   `--,   |
-	//  |       \  |
-	// (v3)------(v2)
-	Vertex vertices[] = {
-		{{-1.0f, -1.0f, 0.0f}},
-		{{1.0f, -1.0f, 0.0f}},
-		{{1.0f, 1.0f, 0.0f}},
-		{{-1.0f, 1.0f, 0.0f}},
-	};
-
-	uint32_t indices[] = { 0, 1, 2, 2, 3, 0 };
-
-	vertex_buffer = createBuffer(sizeof(vertices), vertices,
+	vertex_buffer = createBuffer(vertices.size() * sizeof(Vertex), vertices.data(),
 	                             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-	index_buffer = createBuffer(sizeof(indices), indices,
+	index_buffer = createBuffer(indices.size() * sizeof(uint32_t), indices.data(),
 	                            VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+	
+	index_count = indices.size();
 }
 
 void shutdown() {
 	VkDevice& device = veekay::app.vk_device;
 
-	// NOTE: Destroy resources here, do not cause leaks in your program!
+	// ПРИМЕЧАНИЕ: Освобождаем ресурсы, избегаем утечек памяти
 	destroyBuffer(index_buffer);
 	destroyBuffer(vertex_buffer);
 
@@ -491,25 +564,77 @@ void shutdown() {
 }
 
 void update(double time) {
-	ImGui::Begin("Controls:");
-	ImGui::InputFloat3("Translation", reinterpret_cast<float*>(&model_position));
-	ImGui::SliderFloat("Rotation", &model_rotation, 0.0f, 2.0f * M_PI);
-	ImGui::Checkbox("Spin?", &model_spin);
-	// TODO: Your GUI stuff here
+	ImGui::Begin("Cone Controls");
+	
+	ImGui::SliderFloat("Rotation Speed", &rotation_speed_multiplier, 0.0f, 3.0f);
+	
+	ImGui::Separator();
+	
+	ImGui::Text("Projection Type:");
+	if (ImGui::RadioButton("Perspective", use_perspective_projection)) {
+		use_perspective_projection = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::RadioButton("Orthographic", !use_perspective_projection)) {
+		use_perspective_projection = false;
+	}
+	
+	ImGui::Separator();
+
+	ImGui::Text("Animation Control:");
+	if (ImGui::Button(animation_paused ? "Resume" : "Pause")) {
+		animation_paused = !animation_paused;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Reverse Direction")) {
+		animation_direction = -animation_direction;
+	}
+	ImGui::Text("Direction: %s", animation_direction > 0 ? "Forward" : "Reverse");
+	
+	ImGui::Separator();
+	ImGui::Text("Cone Properties:");
+	
+	// Показываем свойства каждого конуса
+	for (int i = 0; i < NUM_CONES; i++) {
+		ImGui::PushID(i);
+		char label[32];
+		snprintf(label, sizeof(label), "Cone %d", i + 1);
+		
+		if (ImGui::TreeNode(label)) {
+			ImGui::InputFloat3("Position", reinterpret_cast<float*>(&cones[i].position));
+			ImGui::SliderFloat("Individual Speed", &cones[i].rotation_speed, 0.0f, 3.0f);
+			ImGui::SliderFloat("Scale", &cones[i].scale, 0.1f, 2.0f);
+			ImGui::Text("Current Rotation: %.2f rad", cones[i].rotation);
+			ImGui::TreePop();
+		}
+		
+		ImGui::PopID();
+	}
+	
+	ImGui::Separator();
+	ImGui::Text("Fixed Color (read-only):");
+	ImGui::ColorEdit3("##FixedColor", reinterpret_cast<float*>(&fixed_color), ImGuiColorEditFlags_NoInputs);
+	
 	ImGui::End();
 
-	// NOTE: Animation code and other runtime variable updates go here
-	if (model_spin) {
-		model_rotation = float(time);
+	// Обновление вращения конусов (независимо друг от друга)
+	static double last_time = 0.0;
+	double delta_time = time - last_time;
+	last_time = time;
+	
+	// Применяем паузу и реверс
+	if (!animation_paused) {
+		for (int i = 0; i < NUM_CONES; i++) {
+			cones[i].rotation += cones[i].rotation_speed * rotation_speed_multiplier * animation_direction * float(delta_time);
+			cones[i].rotation = fmodf(cones[i].rotation, 2.0f * M_PI);
+		}
 	}
-
-	model_rotation = fmodf(model_rotation, 2.0f * M_PI);
 }
 
 void render(VkCommandBuffer cmd, VkFramebuffer framebuffer) {
 	vkResetCommandBuffer(cmd, 0);
 
-	{ // NOTE: Start recording rendering commands
+	{ // ПРИМЕЧАНИЕ: Начинаем запись команд рендеринга
 		VkCommandBufferBeginInfo info{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -518,7 +643,7 @@ void render(VkCommandBuffer cmd, VkFramebuffer framebuffer) {
 		vkBeginCommandBuffer(cmd, &info);
 	}
 
-	{ // NOTE: Use current swapchain framebuffer and clear it
+	{ // ПРИМЕЧАНИЕ: Используем текущий framebuffer свопчейна и очищаем его
 		VkClearValue clear_color{.color = {{0.1f, 0.1f, 0.1f, 1.0f}}};
 		VkClearValue clear_depth{.depthStencil = {1.0f, 0}};
 
@@ -541,40 +666,55 @@ void render(VkCommandBuffer cmd, VkFramebuffer framebuffer) {
 		vkCmdBeginRenderPass(cmd, &info, VK_SUBPASS_CONTENTS_INLINE);
 	}
 
-	// TODO: Vulkan rendering code here
-	// NOTE: ShaderConstant updates, vkCmdXXX expected to be here
+	// ПРИМЕЧАНИЕ: Рисуем несколько конусов
 	{
-		// NOTE: Use our new shiny graphics pipeline
+	// ПРИМЕЧАНИЕ: Используем наш графический пайплайн для конуса
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-
-		// NOTE: Use our quad vertex buffer
+	// ПРИМЕЧАНИЕ: Привязываем вершинный и индексный буферы конуса один раз
 		VkDeviceSize offset = 0;
 		vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer.buffer, &offset);
-
-		// NOTE: Use our quad index buffer
 		vkCmdBindIndexBuffer(cmd, index_buffer.buffer, offset, VK_INDEX_TYPE_UINT32);
 
-		// NOTE: Variables like model_XXX were declared globally
-		ShaderConstants constants{
-			.projection = projection(
-				camera_fov,
-				float(veekay::app.window_width) / float(veekay::app.window_height),
-				camera_near_plane, camera_far_plane),
+		// Вычисляем матрицу проекции один раз
+		Matrix proj;
+		float aspect_ratio = float(veekay::app.window_width) / float(veekay::app.window_height);
+		
+		if (use_perspective_projection) {
+			proj = projection(camera_fov, aspect_ratio, camera_near_plane, camera_far_plane);
+		} else {
+			// Ортографическая проекция с фиксированными границами
+			float ortho_size = 8.0f; // Размер видимой области
+			float left = -ortho_size * aspect_ratio;
+			float right = ortho_size * aspect_ratio;
+			float bottom = -ortho_size;
+			float top = ortho_size;
+			proj = orthographic_projection(left, right, bottom, top, camera_near_plane, camera_far_plane);
+		}
 
-			.transform = multiply(rotation({0.0f, 1.0f, 0.0f}, model_rotation),
-			                      translation(model_position)),
+		// Рисуем каждый конус с собственной матрицей трансформации, но с фиксированным цветом
+		for (int i = 0; i < NUM_CONES; i++) {
+			// Вычисляем матрицу преобразования: масштаб -> вращение -> перенос
+			Matrix scale_matrix = scaling(cones[i].scale);
+			Matrix rot_matrix = rotation({0.0f, 1.0f, 0.0f}, cones[i].rotation);
+			Matrix trans_matrix = translation(cones[i].position);
+			
+			Matrix transform = multiply(multiply(trans_matrix, rot_matrix), scale_matrix);
 
-			.color = model_color,
-		};
+			ShaderConstants constants{
+				.projection = proj,
+				.transform = transform,
+				.color = fixed_color,  // Фиксированный цвет для всех конусов
+			};
 
-		// NOTE: Update constant memory with new shader constants
-		vkCmdPushConstants(cmd, pipeline_layout,
-		                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-		                   0, sizeof(ShaderConstants), &constants);
+			// Обновляем константы шейдера для этого конуса
+			vkCmdPushConstants(cmd, pipeline_layout,
+							   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+							   0, sizeof(ShaderConstants), &constants);
 
-		// NOTE: Draw 6 indices (3 vertices * 2 triangles), 1 group, no offsets
-		vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+			vkCmdBindIndexBuffer(cmd, index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
+		}
 	}
 
 	vkCmdEndRenderPass(cmd);
